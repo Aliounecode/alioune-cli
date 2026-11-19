@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "alioune"
-version = "0.1.0"
+version = "0.1.1"
 description = "Générateur de projets et de code pour FastAPI : l'équivalent d'Angular CLI ou d'Artisan (Laravel), en français."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -25,6 +25,12 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+
+[project.urls]
+Homepage = "https://github.com/Aliounecode/alioune-cli"
+Repository = "https://github.com/Aliounecode/alioune-cli"
+Issues = "https://github.com/Aliounecode/alioune-cli/issues"
+Changelog = "https://github.com/Aliounecode/alioune-cli/blob/main/CHANGELOG.md"
 
 [project.scripts]
 alioune = "alioune.cli:app"
