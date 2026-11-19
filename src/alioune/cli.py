@@ -145,7 +145,7 @@ def generer(
         Optional[str],
         typer.Option(
             "--champs", "-c",
-            help="Champs : nom:str,prix:decimal,note:text? (types : str text int float decimal bool date datetime ; ? = facultatif).",
+            help="Champs : nom:str,prix:decimal,note:text?,categorie:fk (types : str text int float decimal bool date datetime ; ? = facultatif ; fk = relation vers un autre modèle, fk(modele) pour viser un autre nom).",
         ),
     ] = None,
     pluriel: Annotated[

@@ -4,7 +4,7 @@ from collections.abc import Iterator
 from typing import Annotated
 
 from fastapi import Depends
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine{% if base == "sqlite" %}, event{% endif %}
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import obtenir_parametres
@@ -17,6 +17,14 @@ moteur = create_engine(
     parametres.url_base_de_donnees,
     connect_args={"check_same_thread": False},
 )
+
+
+@event.listens_for(moteur, "connect")
+def activer_cles_etrangeres(connexion_dbapi, _enregistrement) -> None:
+    """SQLite ignore les clés étrangères tant qu'on ne les active pas."""
+    curseur = connexion_dbapi.cursor()
+    curseur.execute("PRAGMA foreign_keys=ON")
+    curseur.close()
 {%- else -%}
 # Le moteur est créé sans se connecter : l'application démarre même si
 # PostgreSQL n'est pas encore lancé (voir la route /sante).

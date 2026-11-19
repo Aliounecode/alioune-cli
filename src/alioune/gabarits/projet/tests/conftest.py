@@ -2,7 +2,7 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -19,6 +19,13 @@ def session_test() -> Iterator[Session]:
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+
+    @event.listens_for(moteur, "connect")
+    def activer_cles_etrangeres(connexion_dbapi, _enregistrement) -> None:
+        curseur = connexion_dbapi.cursor()
+        curseur.execute("PRAGMA foreign_keys=ON")
+        curseur.close()
+
     Base.metadata.create_all(moteur)
     fabrique = sessionmaker(bind=moteur, autoflush=False, expire_on_commit=False)
     with fabrique() as session:

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 340" width="1200" height="340" role="img" aria-label="alioune : le CLI qui génère ton API FastAPI">
+  <rect width="1200" height="340" fill="#fffdf7"/>
+  <rect x="48" y="44" width="1112" height="268" rx="18" fill="#0f172a"/>
+  <rect x="36" y="32" width="1112" height="268" rx="18" fill="#ffffff" stroke="#0f172a" stroke-width="5"/>
+  <rect x="76" y="68" width="372" height="40" rx="20" fill="#facc15" stroke="#0f172a" stroke-width="3"/>
+  <text x="262" y="95" text-anchor="middle" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="20" font-weight="700" fill="#0f172a">FastAPI · SQLAlchemy 2.0 · Alembic</text>
+  <text x="74" y="204" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="104" font-weight="800" letter-spacing="-3" fill="#0f172a">alioune</text>
+  <text x="78" y="250" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="27" fill="#475569">Le CLI qui crée et fait grandir ton API FastAPI.</text>
+  <text x="78" y="282" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="20" fill="#64748b">Comme ng new pour Angular, comme Artisan pour Laravel.</text>
+  <rect x="690" y="70" width="410" height="196" rx="12" fill="#0f172a"/>
+  <circle cx="716" cy="94" r="7" fill="#f87171"/><circle cx="740" cy="94" r="7" fill="#facc15"/><circle cx="764" cy="94" r="7" fill="#4ade80"/>
+  <text x="716" y="146" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="21" fill="#e2e8f0"><tspan fill="#4ade80">$</tspan> pipx install alioune</text>
+  <text x="716" y="184" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="21" fill="#e2e8f0"><tspan fill="#4ade80">$</tspan> alioune new ma-boutique</text>
+  <text x="716" y="222" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="21" fill="#e2e8f0"><tspan fill="#4ade80">$</tspan> alioune serve</text>
+  <rect x="716" y="236" width="12" height="4" fill="#4ade80"/>
+</svg>

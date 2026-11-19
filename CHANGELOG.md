@@ -1,5 +1,13 @@
 # Journal des modifications
 
+## 0.2.0
+
+- `alioune generate` : relations entre tables avec le type `fk` (`categorie:fk`, `origine:fk(pays)?`) : clé étrangère, index, relation SQLAlchemy, migration, vérification de l'existence (422) et refus de suppression d'un élément utilisé (409).
+- Les ressources générées refusent `null` sur un champ obligatoire lors d'une modification (422 au lieu d'une erreur serveur).
+- Chaque ressource générée expose `donnees_valides()` dans ses tests, que les ressources liées réutilisent.
+- Les projets créés activent les clés étrangères de SQLite (dans l'application et dans les tests).
+- Nouveau README illustré (démo animée, captures et schémas).
+
 ## 0.1.1
 
 - Ajout des liens du projet (GitHub) sur la page PyPI.

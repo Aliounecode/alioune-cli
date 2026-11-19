@@ -2,10 +2,15 @@
 
 {% endif -%}
 from sqlalchemy import {{ imports_sqlalchemy }}
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column{% if relations %}, relationship{% endif %}
 
 from app.modeles.base import Base, HorodatageMixin
-
+{% if relations %}
+if TYPE_CHECKING:
+{%- for cible in cibles %}
+    from app.modeles.{{ cible.snake }} import {{ cible.classe }}
+{%- endfor %}
+{% endif %}
 
 class {{ nom_classe }}(HorodatageMixin, Base):
     __tablename__ = "{{ nom_table }}"
@@ -13,4 +18,7 @@ class {{ nom_classe }}(HorodatageMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 {% for champ in champs %}
     {{ champ.nom }}: Mapped[{{ champ.annotation }}] = mapped_column({{ champ.colonne }})
+{%- endfor %}
+{% for r in relations %}
+    {{ r.relation }}: Mapped["{{ r.classe }}{{ ' | None' if r.nullable }}"] = relationship(foreign_keys=[{{ r.attribut }}])
 {%- endfor %}

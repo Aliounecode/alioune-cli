@@ -1,7 +1,10 @@
 {{ imports_stdlib }}
 
-from pydantic import BaseModel, ConfigDict
-
+from pydantic import BaseModel, ConfigDict{% if a_champ_obligatoire %}, model_validator{% endif %}
+{% if a_champ_obligatoire %}
+# Champs qu'on ne peut pas mettre à null lors d'une modification.
+CHAMPS_OBLIGATOIRES = ({% for nom in champs_obligatoires %}"{{ nom }}", {% endfor %})
+{% endif %}
 
 class {{ nom_classe }}Base(BaseModel):
     """Champs communs à la création et à la lecture."""
@@ -19,7 +22,14 @@ class {{ nom_classe }}MiseAJour(BaseModel):
 {% for champ in champs %}
     {{ champ.nom }}: {{ champ.py }} | None = None
 {%- endfor %}
-
+{% if a_champ_obligatoire %}
+    @model_validator(mode="after")
+    def refuser_null_sur_champs_obligatoires(self) -> "{{ nom_classe }}MiseAJour":
+        for champ in CHAMPS_OBLIGATOIRES:
+            if champ in self.model_fields_set and getattr(self, champ) is None:
+                raise ValueError(f"« {champ} » ne peut pas être null")
+        return self
+{% endif %}
 
 class {{ nom_classe }}Lecture({{ nom_classe }}Base):
     """Forme renvoyée par l'API."""

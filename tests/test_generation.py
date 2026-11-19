@@ -140,3 +140,80 @@ def test_hors_projet_les_commandes_echouent(tmp_path, monkeypatch) -> None:
 
     assert runner.invoke(app, ["g", "modele", "produit"]).exit_code == 1
     assert runner.invoke(app, ["auth"]).exit_code == 1
+
+
+# --- Relations (fk) ---------------------------------------------------------
+
+def test_analyse_des_relations() -> None:
+    champs = analyser_champs("categorie:fk,origine:fk(pays)?,fournisseur_id:fk")
+
+    assert [c.nom for c in champs] == ["categorie_id", "origine_id", "fournisseur_id"]
+    assert [c.cible for c in champs] == ["categorie", "pays", "fournisseur"]
+    assert champs[1].nullable and champs[1].ondelete == "SET NULL"
+    assert champs[0].ondelete == "RESTRICT"
+    assert champs[0].annotation == "int" and champs[1].annotation == "int | None"
+    assert champs[0].relation == "categorie"
+
+
+@pytest.mark.parametrize("texte", ["x:fk?(pays)", "categorie:fk,categorie:str", "x:fk(Pays Bas)"])
+def test_relations_invalides(texte: str) -> None:
+    with pytest.raises(ErreurPlan):
+        analyser_champs(texte)
+
+
+def _ressource(nom: str, champs: str, *options: str):
+    return runner.invoke(app, ["g", "ressource", nom, "-c", champs, *options])
+
+
+def test_ressource_avec_relation(projet: Path) -> None:
+    assert _ressource("categorie", "nom:str").exit_code == 0
+    resultat = _ressource("produit", "nom:str,categorie:fk,fournisseur:fk(categorie)?")
+
+    assert resultat.exit_code == 0, resultat.output
+    modele = (projet / "app/modeles/produit.py").read_text()
+    assert 'ForeignKey("categories.id", ondelete="RESTRICT")' in modele
+    assert 'ForeignKey("categories.id", ondelete="SET NULL")' in modele
+    assert 'categorie: Mapped["Categorie"] = relationship(foreign_keys=[categorie_id])' in modele
+    assert 'fournisseur: Mapped["Categorie | None"]' in modele
+    migration = next((projet / "alembic/versions").glob("*produits.py")).read_text()
+    assert 'sa.ForeignKeyConstraint(["categorie_id"], ["categories.id"], ondelete="RESTRICT")' in migration
+    assert 'op.create_index(op.f("ix_produits_categorie_id")' in migration
+    routeur = (projet / "app/routeurs/produit.py").read_text()
+    assert "_verifier_relations" in routeur and "from app.modeles.categorie import Categorie" in routeur
+    assert "def donnees_valides" in (projet / "tests/test_produits.py").read_text()
+    _compiler_tout(projet)
+
+
+def test_relation_vers_un_modele_absent_avertit(projet: Path) -> None:
+    resultat = _ressource("produit", "nom:str,categorie:fk")
+
+    assert resultat.exit_code == 0
+    assert "n'existe pas encore" in resultat.output
+    assert "Tests non générés" in resultat.output
+    assert not (projet / "tests/test_produits.py").exists()
+
+
+def test_relation_respecte_le_pluriel_du_modele_lie(projet: Path) -> None:
+    runner.invoke(app, ["g", "ressource", "ville", "-c", "nom:str", "--pluriel", "villes_senegal"])
+    _ressource("quartier", "nom:str,ville:fk")
+
+    assert 'ForeignKey("villes_senegal.id"' in (projet / "app/modeles/quartier.py").read_text()
+
+
+def test_relation_vers_soi_meme_et_config_refusees(projet: Path) -> None:
+    assert _ressource("categorie", "parent:fk(categorie)?").exit_code == 1
+    resultat = runner.invoke(app, ["g", "config", "stripe", "-c", "cle:fk"])
+    assert resultat.exit_code == 1
+
+
+def test_relation_vers_utilisateur(projet: Path) -> None:
+    assert runner.invoke(app, ["auth", "--sans-installation"]).exit_code == 0
+
+    resultat = _ressource("commande", "reference:str,client:fk(utilisateur)")
+
+    assert resultat.exit_code == 0, resultat.output
+    assert 'ForeignKey("utilisateurs.id"' in (projet / "app/modeles/commande.py").read_text()
+    test = (projet / "tests/test_commandes.py").read_text()
+    assert "_creer_utilisateur" in test and "import uuid" in test
+    assert "409" not in test  # pas de route de suppression sur les utilisateurs
+    _compiler_tout(projet)

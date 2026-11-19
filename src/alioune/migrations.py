@@ -74,11 +74,15 @@ def preparer_migration(
 
 
 def lignes_creation_table(
-    nom_table: str, colonnes: list[str], index: list[tuple[str, str, bool]] | None = None
+    nom_table: str,
+    colonnes: list[str],
+    index: list[tuple[str, str, bool]] | None = None,
+    contraintes: list[str] | None = None,
 ) -> tuple[list[str], list[str]]:
     """Construit les lignes `upgrade` / `downgrade` d'une création de table.
 
     `colonnes` : lignes de code `sa.Column(...)`. `index` : (nom, colonne, unique).
+    `contraintes` : lignes de code `sa.ForeignKeyConstraint(...)` ajoutées après la clé primaire.
     """
     upgrade = [
         "op.create_table(",
@@ -88,6 +92,7 @@ def lignes_creation_table(
         '    sa.Column("cree_le", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),',
         '    sa.Column("modifie_le", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),',
         '    sa.PrimaryKeyConstraint("id"),',
+        *[f"    {contrainte}," for contrainte in contraintes or []],
         ")",
     ]
     downgrade: list[str] = []
