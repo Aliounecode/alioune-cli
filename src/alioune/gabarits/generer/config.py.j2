@@ -1,0 +1,25 @@
+"""Paramètres de « {{ nom_libelle | lower }} » : variables d'environnement préfixées par {{ prefixe_env }}_."""
+
+from functools import lru_cache
+{% if imports_stdlib %}{{ imports_stdlib }}
+{% endif %}
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Parametres{{ nom_classe }}(BaseSettings):
+    """Valeurs lues dans l'environnement ou dans .env."""
+{% for champ in champs %}
+    {{ champ.nom }}: {{ champ.annotation }}{{ champ.defaut }}
+{%- endfor %}
+
+    model_config = SettingsConfigDict(
+        env_prefix="{{ prefixe_env }}_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+
+@lru_cache
+def obtenir_parametres_{{ nom_snake }}() -> Parametres{{ nom_classe }}:
+    return Parametres{{ nom_classe }}()

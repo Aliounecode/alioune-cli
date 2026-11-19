@@ -1,0 +1,31 @@
+{{ imports_stdlib }}
+
+from pydantic import BaseModel, ConfigDict
+
+
+class {{ nom_classe }}Base(BaseModel):
+    """Champs communs à la création et à la lecture."""
+{% for champ in champs %}
+    {{ champ.nom }}: {{ champ.annotation }}{{ champ.defaut }}
+{%- endfor %}
+
+
+class {{ nom_classe }}Creation({{ nom_classe }}Base):
+    """Données reçues pour créer : {{ nom_libelle | lower }}."""
+
+
+class {{ nom_classe }}MiseAJour(BaseModel):
+    """Données reçues pour modifier (PATCH) : tous les champs sont optionnels."""
+{% for champ in champs %}
+    {{ champ.nom }}: {{ champ.py }} | None = None
+{%- endfor %}
+
+
+class {{ nom_classe }}Lecture({{ nom_classe }}Base):
+    """Forme renvoyée par l'API."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    cree_le: datetime
+    modifie_le: datetime

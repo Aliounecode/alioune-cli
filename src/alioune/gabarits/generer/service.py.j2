@@ -1,0 +1,39 @@
+"""Logique métier : {{ nom_libelle | lower }}."""
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.modeles.{{ nom_snake }} import {{ nom_classe }}
+from app.schemas.{{ nom_snake }} import {{ nom_classe }}Creation, {{ nom_classe }}MiseAJour
+
+
+def lister(session: Session, *, saut: int = 0, limite: int = 50) -> list[{{ nom_classe }}]:
+    requete = select({{ nom_classe }}).order_by({{ nom_classe }}.id).offset(saut).limit(limite)
+    return list(session.scalars(requete))
+
+
+def obtenir(session: Session, identifiant: int) -> {{ nom_classe }} | None:
+    return session.get({{ nom_classe }}, identifiant)
+
+
+def creer(session: Session, donnees: {{ nom_classe }}Creation) -> {{ nom_classe }}:
+    objet = {{ nom_classe }}(**donnees.model_dump())
+    session.add(objet)
+    session.commit()
+    session.refresh(objet)
+    return objet
+
+
+def mettre_a_jour(
+    session: Session, objet: {{ nom_classe }}, donnees: {{ nom_classe }}MiseAJour
+) -> {{ nom_classe }}:
+    for champ, valeur in donnees.model_dump(exclude_unset=True).items():
+        setattr(objet, champ, valeur)
+    session.commit()
+    session.refresh(objet)
+    return objet
+
+
+def supprimer(session: Session, objet: {{ nom_classe }}) -> None:
+    session.delete(objet)
+    session.commit()

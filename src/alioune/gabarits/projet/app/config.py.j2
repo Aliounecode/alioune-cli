@@ -1,0 +1,40 @@
+"""Paramètres de l'application, lus depuis les variables d'environnement et `.env`."""
+
+from functools import lru_cache
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Parametres(BaseSettings):
+    nom_application: str = "{{ nom_affichage }}"
+    version: str = "0.1.0"
+    environnement: str = "developpement"
+
+    # Lue depuis la variable DATABASE_URL.
+    url_base_de_donnees: str = Field(
+        default="{% if base == 'sqlite' %}sqlite:///./{{ nom_base }}.db{% else %}postgresql+psycopg://postgres:motdepasse@localhost:5432/{{ nom_base }}{% endif %}",
+        validation_alias="DATABASE_URL",
+    )
+    cle_secrete: str = "changez-moi"
+    origines_autorisees: str = "http://localhost:4200"
+
+    # Utilisés par l'authentification (alioune auth).
+    algorithme_jwt: str = "HS256"
+    duree_jeton_minutes: int = 60
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    @property
+    def liste_origines(self) -> list[str]:
+        """Origines CORS autorisées (séparées par des virgules dans .env)."""
+        return [origine.strip() for origine in self.origines_autorisees.split(",") if origine.strip()]
+
+
+@lru_cache
+def obtenir_parametres() -> Parametres:
+    return Parametres()

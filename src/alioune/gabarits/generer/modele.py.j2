@@ -1,0 +1,16 @@
+{% if imports_stdlib %}{{ imports_stdlib }}
+
+{% endif -%}
+from sqlalchemy import {{ imports_sqlalchemy }}
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.modeles.base import Base, HorodatageMixin
+
+
+class {{ nom_classe }}(HorodatageMixin, Base):
+    __tablename__ = "{{ nom_table }}"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+{% for champ in champs %}
+    {{ champ.nom }}: Mapped[{{ champ.annotation }}] = mapped_column({{ champ.colonne }})
+{%- endfor %}

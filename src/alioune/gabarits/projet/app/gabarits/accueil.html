@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ nom }}</title>
+  <style>
+    :root { --encre: #0f172a; --papier: #fffdf7; --accent: #16a34a; --accent-2: #facc15; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px;
+      background: var(--papier); color: var(--encre);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    main { width: min(640px, 100%); }
+    .carte {
+      border: 3px solid var(--encre); border-radius: 12px; padding: 32px;
+      background: #fff; box-shadow: 8px 8px 0 var(--encre);
+    }
+    .etiquette {
+      display: inline-block; padding: 4px 10px; border: 2px solid var(--encre);
+      background: var(--accent-2); font-size: 13px; font-weight: 700; border-radius: 999px;
+    }
+    h1 { margin: 16px 0 4px; font-size: clamp(28px, 6vw, 42px); line-height: 1.1; }
+    .sous-titre { margin: 0 0 24px; color: #475569; }
+    .liens { display: grid; gap: 12px; }
+    a.lien {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 16px; border: 2px solid var(--encre); border-radius: 8px;
+      color: var(--encre); text-decoration: none; font-weight: 600; background: #fff;
+    }
+    a.lien:hover, a.lien:focus-visible { background: var(--accent); color: #fff; outline: none; }
+    a.lien small { font-weight: 400; opacity: .8; }
+    footer { margin-top: 20px; font-size: 13px; color: #64748b; text-align: center; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="carte">
+      <span class="etiquette">v{{ version }} · {{ environnement }}</span>
+      <h1>{{ nom }}</h1>
+      <p class="sous-titre">Ton API FastAPI est en marche. Bonne construction !</p>
+      <nav class="liens">
+        <a class="lien" href="/docs">Documentation interactive <small>/docs</small></a>
+        <a class="lien" href="/redoc">Documentation ReDoc <small>/redoc</small></a>
+        <a class="lien" href="/sante">État de l'API <small>/sante</small></a>
+        <a class="lien" href="https://fastapi.tiangolo.com/fr/" target="_blank" rel="noopener">Documentation de FastAPI <small>↗</small></a>
+        <a class="lien" href="https://docs.sqlalchemy.org/en/20/" target="_blank" rel="noopener">Documentation de SQLAlchemy <small>↗</small></a>
+        <a class="lien" href="https://alembic.sqlalchemy.org/" target="_blank" rel="noopener">Documentation d'Alembic <small>↗</small></a>
+      </nav>
+    </div>
+    <footer>Généré avec alioune</footer>
+  </main>
+</body>
+</html>

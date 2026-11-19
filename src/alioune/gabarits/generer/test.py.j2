@@ -1,0 +1,65 @@
+"""Tests de l'API : {{ pluriel_libelle | lower }}."""
+
+from fastapi.testclient import TestClient
+
+URL = "/api/{{ pluriel_url }}"
+{% if protege %}
+
+def test_{{ nom_pluriel }}_exigent_un_utilisateur_connecte(client: TestClient) -> None:
+    assert client.get(URL).status_code == 401
+    assert client.post(URL, json={}).status_code == 401
+{% else %}
+DONNEES = {
+{%- for champ in champs %}
+    "{{ champ.nom }}": {{ champ.exemple }},
+{%- endfor %}
+}
+
+
+def test_creer_puis_lire_{{ nom_snake }}(client: TestClient) -> None:
+    creation = client.post(URL, json=DONNEES)
+    assert creation.status_code == 201
+    identifiant = creation.json()["id"]
+
+    lecture = client.get(f"{URL}/{identifiant}")
+    assert lecture.status_code == 200
+    assert lecture.json()["id"] == identifiant
+
+
+def test_lister_{{ nom_pluriel }}(client: TestClient) -> None:
+    client.post(URL, json=DONNEES)
+
+    reponse = client.get(URL)
+
+    assert reponse.status_code == 200
+    assert len(reponse.json()) == 1
+
+
+def test_modifier_{{ nom_snake }}(client: TestClient) -> None:
+    identifiant = client.post(URL, json=DONNEES).json()["id"]
+{% if champs %}
+    champ = "{{ champs[0].nom }}"
+    reponse = client.patch(f"{URL}/{identifiant}", json={champ: DONNEES[champ]})
+
+    assert reponse.status_code == 200
+{%- else %}
+    assert client.patch(f"{URL}/{identifiant}", json={}).status_code == 200
+{%- endif %}
+
+
+def test_supprimer_{{ nom_snake }}(client: TestClient) -> None:
+    identifiant = client.post(URL, json=DONNEES).json()["id"]
+
+    assert client.delete(f"{URL}/{identifiant}").status_code == 204
+    assert client.get(f"{URL}/{identifiant}").status_code == 404
+
+
+def test_{{ nom_snake }}_inconnu_renvoie_404(client: TestClient) -> None:
+    assert client.get(f"{URL}/999999").status_code == 404
+
+{% if a_champ_obligatoire %}
+
+def test_creation_invalide_renvoie_422(client: TestClient) -> None:
+    assert client.post(URL, json={}).status_code == 422
+{% endif %}
+{% endif %}

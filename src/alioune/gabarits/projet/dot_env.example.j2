@@ -1,0 +1,8 @@
+ENVIRONNEMENT=developpement
+{% if base == "sqlite" -%}
+DATABASE_URL=sqlite:///./{{ nom_base }}.db
+{% else -%}
+DATABASE_URL=postgresql+psycopg://postgres:motdepasse@localhost:5432/{{ nom_base }}
+{% endif -%}
+CLE_SECRETE=changez-moi
+ORIGINES_AUTORISEES=http://localhost:4200

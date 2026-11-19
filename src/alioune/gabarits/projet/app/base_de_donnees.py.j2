@@ -1,0 +1,39 @@
+"""Moteur SQLAlchemy 2.0, fabrique de sessions et dépendance FastAPI."""
+
+from collections.abc import Iterator
+from typing import Annotated
+
+from fastapi import Depends
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
+
+from app.config import obtenir_parametres
+
+parametres = obtenir_parametres()
+
+{% if base == "sqlite" -%}
+# SQLite : un même fichier peut être utilisé depuis plusieurs threads (pool de FastAPI).
+moteur = create_engine(
+    parametres.url_base_de_donnees,
+    connect_args={"check_same_thread": False},
+)
+{%- else -%}
+# Le moteur est créé sans se connecter : l'application démarre même si
+# PostgreSQL n'est pas encore lancé (voir la route /sante).
+moteur = create_engine(
+    parametres.url_base_de_donnees,
+    pool_pre_ping=True,
+    connect_args={"connect_timeout": 3},
+)
+{%- endif %}
+
+SessionLocale = sessionmaker(bind=moteur, autoflush=False, expire_on_commit=False)
+
+
+def obtenir_session() -> Iterator[Session]:
+    """Fournit une session par requête, fermée automatiquement."""
+    with SessionLocale() as session:
+        yield session
+
+
+SessionDep = Annotated[Session, Depends(obtenir_session)]

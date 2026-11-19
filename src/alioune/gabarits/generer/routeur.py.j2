@@ -1,0 +1,61 @@
+"""Routes : {{ nom_libelle | lower }}."""
+
+from typing import Annotated
+
+from fastapi import APIRouter, {% if protege %}Depends, {% endif %}HTTPException, Query, status
+{% if protege %}
+from app.dependances import utilisateur_courant
+{%- endif %}
+from app.base_de_donnees import SessionDep
+from app.modeles.{{ nom_snake }} import {{ nom_classe }}
+from app.schemas.{{ nom_snake }} import {{ nom_classe }}Creation, {{ nom_classe }}Lecture, {{ nom_classe }}MiseAJour
+from app.services import {{ nom_snake }} as service_{{ nom_snake }}
+
+routeur = APIRouter(
+    prefix="/{{ pluriel_url }}",
+    tags=["{{ pluriel_libelle }}"],
+{%- if protege %}
+    dependencies=[Depends(utilisateur_courant)],
+{%- endif %}
+)
+
+
+def _obtenir_ou_404(session: SessionDep, identifiant: int) -> {{ nom_classe }}:
+    objet = service_{{ nom_snake }}.obtenir(session, identifiant)
+    if objet is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="{{ nom_libelle }} introuvable")
+    return objet
+
+
+@routeur.get("", response_model=list[{{ nom_classe }}Lecture])
+def lister_{{ nom_pluriel }}(
+    session: SessionDep,
+    saut: Annotated[int, Query(ge=0)] = 0,
+    limite: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> list[{{ nom_classe }}]:
+    """Liste paginée : {{ pluriel_libelle | lower }}."""
+    return service_{{ nom_snake }}.lister(session, saut=saut, limite=limite)
+
+
+@routeur.get("/{identifiant}", response_model={{ nom_classe }}Lecture)
+def lire_{{ nom_snake }}(identifiant: int, session: SessionDep) -> {{ nom_classe }}:
+    return _obtenir_ou_404(session, identifiant)
+
+
+@routeur.post("", response_model={{ nom_classe }}Lecture, status_code=status.HTTP_201_CREATED)
+def creer_{{ nom_snake }}(donnees: {{ nom_classe }}Creation, session: SessionDep) -> {{ nom_classe }}:
+    return service_{{ nom_snake }}.creer(session, donnees)
+
+
+@routeur.patch("/{identifiant}", response_model={{ nom_classe }}Lecture)
+def modifier_{{ nom_snake }}(
+    identifiant: int, donnees: {{ nom_classe }}MiseAJour, session: SessionDep
+) -> {{ nom_classe }}:
+    objet = _obtenir_ou_404(session, identifiant)
+    return service_{{ nom_snake }}.mettre_a_jour(session, objet, donnees)
+
+
+@routeur.delete("/{identifiant}", status_code=status.HTTP_204_NO_CONTENT)
+def supprimer_{{ nom_snake }}(identifiant: int, session: SessionDep) -> None:
+    objet = _obtenir_ou_404(session, identifiant)
+    service_{{ nom_snake }}.supprimer(session, objet)
