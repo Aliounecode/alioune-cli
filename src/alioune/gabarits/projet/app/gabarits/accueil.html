@@ -5,51 +5,116 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ nom }}</title>
   <style>
-    :root { --encre: #0f172a; --papier: #fffdf7; --accent: #16a34a; --accent-2: #facc15; }
+    :root {
+      --encre: #0f172a; --papier: #fffdf7; --carte: #ffffff; --discret: #475569;
+      --accent: #16a34a; --accent-2: #facc15; --code: #0f172a; --code-texte: #e2e8f0;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --encre: #f1f5f9; --papier: #0b1220; --carte: #121b2e; --discret: #94a3b8;
+        --accent: #22c55e; --accent-2: #facc15; --code: #050a14; --code-texte: #e2e8f0;
+      }
+    }
     * { box-sizing: border-box; }
     body {
-      margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px;
+      margin: 0; min-height: 100vh; padding: 40px 20px 28px;
       background: var(--papier); color: var(--encre);
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background-image: radial-gradient(color-mix(in srgb, var(--encre) 12%, transparent) 1px, transparent 1px);
+      background-size: 22px 22px;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.5;
     }
-    main { width: min(640px, 100%); }
-    .carte {
-      border: 3px solid var(--encre); border-radius: 12px; padding: 32px;
-      background: #fff; box-shadow: 8px 8px 0 var(--encre);
+    main { width: min(860px, 100%); margin: 0 auto; display: grid; gap: 28px; }
+    .statut {
+      display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px;
+      border: 2px solid var(--encre); border-radius: 999px; background: var(--carte);
+      font-size: 13px; font-weight: 700;
     }
-    .etiquette {
-      display: inline-block; padding: 4px 10px; border: 2px solid var(--encre);
-      background: var(--accent-2); font-size: 13px; font-weight: 700; border-radius: 999px;
-    }
-    h1 { margin: 16px 0 4px; font-size: clamp(28px, 6vw, 42px); line-height: 1.1; }
-    .sous-titre { margin: 0 0 24px; color: #475569; }
-    .liens { display: grid; gap: 12px; }
+    .point { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); animation: pouls 1.8s infinite; }
+    @keyframes pouls { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent); } 70%, 100% { box-shadow: 0 0 0 9px transparent; } }
+    @media (prefers-reduced-motion: reduce) { .point { animation: none; } }
+    h1 { margin: 18px 0 8px; font-size: clamp(36px, 8vw, 64px); line-height: 1.02; letter-spacing: -.02em; }
+    h1 mark { background: var(--accent-2); color: #0f172a; padding: 0 .15em; border-radius: 6px; }
+    .intro { margin: 0; max-width: 56ch; color: var(--discret); font-size: 18px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    .puce { padding: 3px 10px; border: 2px solid var(--encre); border-radius: 6px; font-size: 13px; font-weight: 600; background: var(--carte); }
+    .grille { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+    .carte { border: 3px solid var(--encre); border-radius: 14px; padding: 22px; background: var(--carte); box-shadow: 6px 6px 0 var(--encre); }
+    h2 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase; letter-spacing: .08em; }
+    .liens { display: grid; gap: 10px; }
     a.lien {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 12px 16px; border: 2px solid var(--encre); border-radius: 8px;
-      color: var(--encre); text-decoration: none; font-weight: 600; background: #fff;
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+      padding: 11px 14px; border: 2px solid var(--encre); border-radius: 8px;
+      color: var(--encre); text-decoration: none; font-weight: 600;
+      transition: transform .12s, background .12s;
     }
-    a.lien:hover, a.lien:focus-visible { background: var(--accent); color: #fff; outline: none; }
-    a.lien small { font-weight: 400; opacity: .8; }
-    footer { margin-top: 20px; font-size: 13px; color: #64748b; text-align: center; }
+    a.lien:hover, a.lien:focus-visible { background: var(--accent); color: #fff; transform: translateX(3px); outline: none; }
+    a.lien small { font-weight: 500; opacity: .75; font-family: ui-monospace, Menlo, Consolas, monospace; }
+    .vide { margin: 0; color: var(--discret); font-size: 14px; }
+    pre {
+      margin: 0 0 10px; padding: 12px 14px; border-radius: 8px; overflow-x: auto;
+      background: var(--code); color: var(--code-texte); font-size: 13px; line-height: 1.55;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+    }
+    pre .c { color: #94a3b8; }
+    footer { text-align: center; font-size: 13px; color: var(--discret); }
+    footer a { color: inherit; }
   </style>
 </head>
 <body>
   <main>
-    <div class="carte">
-      <span class="etiquette">v{{ version }} · {{ environnement }}</span>
-      <h1>{{ nom }}</h1>
-      <p class="sous-titre">Ton API FastAPI est en marche. Bonne construction !</p>
+    <header>
+      <span class="statut"><span class="point" aria-hidden="true"></span>API en marche</span>
+      <h1><mark>{{ nom }}</mark></h1>
+      <p class="intro">Ton backend FastAPI est prêt. Explore la documentation, ajoute des ressources et lance tes migrations.</p>
+      <div class="meta">
+        <span class="puce">Application v{{ version }}</span>
+        <span class="puce">{{ environnement }}</span>
+      </div>
+    </header>
+
+    <div class="grille">
+      <section class="carte" aria-labelledby="t-explorer">
+        <h2 id="t-explorer">Explorer</h2>
+        <nav class="liens">
+          <a class="lien" href="/docs">Documentation interactive <small>/docs</small></a>
+          <a class="lien" href="/redoc">Documentation ReDoc <small>/redoc</small></a>
+          <a class="lien" href="/sante">État de l'API <small>/sante</small></a>
+        </nav>
+      </section>
+
+      <section class="carte" aria-labelledby="t-ressources">
+        <h2 id="t-ressources">Ressources</h2>
+        {% if ressources %}
+        <nav class="liens">
+          {% for ressource in ressources %}
+          <a class="lien" href="/docs#/{{ ressource.nom | urlencode }}">{{ ressource.nom }} <small>{{ ressource.routes }} routes</small></a>
+          {% endfor %}
+        </nav>
+        {% else %}
+        <p class="vide">Aucune ressource pour l'instant. Crée la première :</p>
+        <pre><span class="c"># dans le dossier du projet</span>
+alioune g ressource produit -c "nom:str,prix:decimal"
+alioune migrate</pre>
+        {% endif %}
+      </section>
+    </div>
+
+    <section class="carte" aria-labelledby="t-commandes">
+      <h2 id="t-commandes">Commandes utiles</h2>
+      <pre>alioune g ressource produit -c "nom:str,prix:decimal,categorie:fk"
+alioune migrate        <span class="c"># applique les migrations</span>
+alioune routes         <span class="c"># liste les routes de l'API</span>
+alioune auth           <span class="c"># ajoute l'authentification (JWT)</span></pre>
       <nav class="liens">
-        <a class="lien" href="/docs">Documentation interactive <small>/docs</small></a>
-        <a class="lien" href="/redoc">Documentation ReDoc <small>/redoc</small></a>
-        <a class="lien" href="/sante">État de l'API <small>/sante</small></a>
         <a class="lien" href="https://fastapi.tiangolo.com/fr/" target="_blank" rel="noopener">Documentation de FastAPI <small>↗</small></a>
         <a class="lien" href="https://docs.sqlalchemy.org/en/20/" target="_blank" rel="noopener">Documentation de SQLAlchemy <small>↗</small></a>
         <a class="lien" href="https://alembic.sqlalchemy.org/" target="_blank" rel="noopener">Documentation d'Alembic <small>↗</small></a>
       </nav>
-    </div>
-    <footer>Généré avec alioune</footer>
+    </section>
+
+    <footer>
+      Généré avec <a href="https://github.com/Aliounecode/alioune-cli" target="_blank" rel="noopener">alioune</a>{% if version_alioune %} {{ version_alioune }}{% endif %}
+    </footer>
   </main>
 </body>
 </html>

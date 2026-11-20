@@ -1,5 +1,10 @@
 # Journal des modifications
 
+## 0.4.1
+
+- Nouvelle page d'accueil des projets créés : statut animé, liste des ressources de l'API (avec liens vers la documentation), commandes utiles, thème clair/sombre automatique.
+- La page distingue la version de l'application (`version` dans `app/config.py`, « v0.1.0 » par défaut) de la version d'alioune qui a généré le projet (affichée en pied de page).
+
 ## 0.4.0
 
 - Listes générées : recherche `?q=` (champs texte, insensible à la casse), tri `?tri=nom` / `?tri=-nom` et filtres sur les champs `bool` et les relations `fk`.
