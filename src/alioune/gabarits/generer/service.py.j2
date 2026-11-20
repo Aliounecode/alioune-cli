@@ -1,6 +1,6 @@
 """Logique métier : {{ nom_libelle | lower }}."""
 
-from sqlalchemy import select
+from sqlalchemy import {% if champs_recherche %}or_, {% endif %}select
 from sqlalchemy.orm import Session{% if m2m %}, selectinload{% endif %}
 
 {% for cible in cibles_m2m -%}
@@ -17,8 +17,36 @@ def _charger(session: Session, modele: type, identifiants: list[int]) -> list:
     return list(session.scalars(select(modele).where(modele.id.in_(set(identifiants)))))
 {% endif %}
 
-def lister(session: Session, *, saut: int = 0, limite: int = 50) -> list[{{ nom_classe }}]:
-    requete = select({{ nom_classe }}).order_by({{ nom_classe }}.id).offset(saut).limit(limite)
+def lister(
+    session: Session,
+    *,
+    saut: int = 0,
+    limite: int = 50,
+{%- if champs_recherche %}
+    q: str | None = None,
+{%- endif %}
+    tri: str = "id",
+{%- if champs_filtre %}
+    filtres: dict | None = None,
+{%- endif %}
+) -> list[{{ nom_classe }}]:
+    requete = select({{ nom_classe }})
+{%- if champs_filtre %}
+    for champ, valeur in (filtres or {}).items():
+        requete = requete.where(getattr({{ nom_classe }}, champ) == valeur)
+{%- endif %}
+{%- if champs_recherche %}
+    if q:
+        motif = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        requete = requete.where(or_(
+{%- for nom in champs_recherche %}
+            {{ nom_classe }}.{{ nom }}.ilike(motif, escape="\\"),
+{%- endfor %}
+        ))
+{%- endif %}
+    colonne = getattr({{ nom_classe }}, tri.lstrip("-"))
+    requete = requete.order_by(colonne.desc() if tri.startswith("-") else colonne, {{ nom_classe }}.id)
+    requete = requete.offset(saut).limit(limite)
 {%- if m2m %}
     requete = requete.options({% for a in m2m %}selectinload({{ nom_classe }}.{{ a.attribut }}){% if not loop.last %}, {% endif %}{% endfor %})
 {%- endif %}

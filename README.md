@@ -110,6 +110,21 @@ Une **ressource** crée en une commande tout ce qu'il faut pour exposer une tabl
 | `datetime` | `datetime` | `DateTime(timezone=True)` |
 | `fk` | `int` | clé étrangère vers un autre modèle (voir ci-dessous) |
 
+### Recherche, tri et filtres
+
+Les listes générées acceptent tout de suite :
+
+```
+GET /api/produits?q=riz                    # recherche dans les champs texte (str, text)
+GET /api/produits?tri=-prix                # tri décroissant (préfixe -)
+GET /api/produits?actif=true&categorie_id=3  # filtres sur les champs bool et les relations fk
+GET /api/produits?q=riz&tri=nom&saut=20&limite=20
+```
+
+- La recherche ignore la casse et traite `%` et `_` comme des caractères ordinaires.
+- `tri` n'accepte que les champs du modèle (plus `id`, `cree_le`, `modifie_le`) ; un autre nom renvoie 422.
+- Les paramètres apparaissent dans la documentation Swagger (`/docs`).
+
 ### Les relations entre tables
 
 ```bash

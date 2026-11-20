@@ -27,6 +27,9 @@ NOMS_RESERVES = {"base", "__init__"}
 CHAMPS_RESERVES = {"id", "cree_le", "modifie_le"}
 
 # type -> (annotation Python, colonne SQLAlchemy, colonne en migration)
+# Paramètres de requête déjà pris par la liste : un champ de ce nom n'est pas filtrable.
+PARAMETRES_LISTE = {"saut", "limite", "q", "tri", "session", "filtres"}
+
 TYPES: dict[str, tuple[str, str, str]] = {
     "str": ("str", "String(255)", "sa.String(length=255)"),
     "text": ("str", "Text", "sa.Text()"),
@@ -306,6 +309,14 @@ def construire_contexte(nom: str, texte_champs: str | None, pluriel: str | None,
         raise ErreurPlan("Ajoute au moins un champ simple (ex. nom:str) en plus des relations plusieurs-à-plusieurs.")
     obligatoires = [c.nom for c in champs if not c.nullable]
     contexte_relations = _contexte_relations(snake, champs, m2m)
+    champs_recherche = [c.nom for c in champs if not c.est_fk and c.type in ("str", "text")]
+    champs_filtre = [
+        c for c in champs
+        if (c.est_fk or c.type == "bool") and c.nom not in PARAMETRES_LISTE
+    ]
+    automatiques = {r["attribut"] for r in contexte_relations["relations"] if r["auto"]}
+    filtre_test = next((c for c in champs_filtre if c.nom not in automatiques), None)
+    champs_tri = ["id", *[c.nom for c in champs], "cree_le", "modifie_le"]
     for association in contexte_relations["m2m"]:
         association["table_association"] = f"{nom_pluriel}_{association['table']}"
         association["colonne_proprietaire"] = f"{snake}_id"
@@ -322,6 +333,11 @@ def construire_contexte(nom: str, texte_champs: str | None, pluriel: str | None,
         "protege": False,
         "a_champ_obligatoire": bool(obligatoires),
         "champs_obligatoires": obligatoires,
+        "champs_recherche": champs_recherche,
+        "champs_filtre": champs_filtre,
+        "filtre_test": filtre_test,
+        "champs_tri": champs_tri,
+        "tri_motif": "^-?(" + "|".join(champs_tri) + ")$",
         **contexte_relations,
     }
 

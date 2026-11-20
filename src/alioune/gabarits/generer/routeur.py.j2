@@ -58,9 +58,40 @@ def lister_{{ nom_pluriel }}(
     session: SessionDep,
     saut: Annotated[int, Query(ge=0)] = 0,
     limite: Annotated[int, Query(ge=1, le=200)] = 50,
+{%- if champs_recherche %}
+    q: Annotated[
+        str | None,
+        Query(max_length=100, description="Recherche dans : {{ champs_recherche | join(', ') }}"),
+    ] = None,
+{%- endif %}
+    tri: Annotated[
+        str,
+        Query(pattern=r"{{ tri_motif }}", description="Champ de tri ; préfixe « - » pour l'ordre décroissant"),
+    ] = "id",
+{%- for f in champs_filtre %}
+    {{ f.nom }}: {{ "int" if f.est_fk else "bool" }} | None = None,
+{%- endfor %}
 ) -> list[{{ nom_classe }}]:
-    """Liste paginée : {{ pluriel_libelle | lower }}."""
-    return service_{{ nom_snake }}.lister(session, saut=saut, limite=limite)
+    """Liste paginée et triable{% if champs_recherche %}, avec recherche{% endif %}{% if champs_filtre %}, avec filtres{% endif %} : {{ pluriel_libelle | lower }}."""
+{%- if champs_filtre %}
+    filtres = {
+{%- for f in champs_filtre %}
+        "{{ f.nom }}": {{ f.nom }},
+{%- endfor %}
+    }
+{%- endif %}
+    return service_{{ nom_snake }}.lister(
+        session,
+        saut=saut,
+        limite=limite,
+{%- if champs_recherche %}
+        q=q,
+{%- endif %}
+        tri=tri,
+{%- if champs_filtre %}
+        filtres={cle: valeur for cle, valeur in filtres.items() if valeur is not None},
+{%- endif %}
+    )
 
 
 @routeur.get("/{identifiant}", response_model={{ nom_classe }}Lecture)

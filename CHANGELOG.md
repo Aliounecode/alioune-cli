@@ -1,5 +1,10 @@
 # Journal des modifications
 
+## 0.4.0
+
+- Listes générées : recherche `?q=` (champs texte, insensible à la casse), tri `?tri=nom` / `?tri=-nom` et filtres sur les champs `bool` et les relations `fk`.
+- Chaque ressource générée est livrée avec des tests de tri, de recherche et de filtre.
+
 ## 0.3.0
 
 - `alioune generate` : relations plusieurs-à-plusieurs avec `m2m(modele)` (table d'association, migration, champ `*_ids` dans l'API, vérification 422).

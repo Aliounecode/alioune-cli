@@ -272,3 +272,33 @@ def test_ressource_auto_referencee(projet: Path) -> None:
     assert 'ForeignKey("categories.id", ondelete="SET NULL")' in modele
     assert "test_associer_parent" in (projet / "tests/test_categories.py").read_text()
     _compiler_tout(projet)
+
+
+# --- Recherche, tri et filtres dans les listes -------------------------------
+
+def test_liste_avec_recherche_tri_et_filtres(projet: Path) -> None:
+    _ressource("categorie", "nom:str")
+    resultat = _ressource("produit", "nom:str,note:text?,actif:bool,categorie:fk")
+
+    assert resultat.exit_code == 0, resultat.output
+    routeur = (projet / "app/routeurs/produit.py").read_text()
+    assert "Recherche dans : nom, note" in routeur
+    assert 'pattern=r"^-?(id|nom|note|actif|categorie_id|cree_le|modifie_le)$"' in routeur
+    assert "actif: bool | None = None" in routeur and "categorie_id: int | None = None" in routeur
+    service = (projet / "app/services/produit.py").read_text()
+    assert "ilike(motif" in service and "filtres" in service
+    tests = (projet / "tests/test_produits.py").read_text()
+    for nom in ("test_trier_les_produits", "test_rechercher_des_produits", "test_filtrer_les_produits"):
+        assert nom in tests
+    _compiler_tout(projet)
+
+
+def test_liste_sans_champ_texte_ni_filtre(projet: Path) -> None:
+    resultat = _ressource("mesure", "valeur:int")
+
+    assert resultat.exit_code == 0, resultat.output
+    routeur = (projet / "app/routeurs/mesure.py").read_text()
+    assert "    q: Annotated" not in routeur and "filtres = {" not in routeur and "    tri: Annotated" in routeur
+    tests = (projet / "tests/test_mesures.py").read_text()
+    assert "test_rechercher" not in tests and "test_filtrer" not in tests
+    _compiler_tout(projet)
