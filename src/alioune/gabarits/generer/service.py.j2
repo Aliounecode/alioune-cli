@@ -1,14 +1,27 @@
 """Logique métier : {{ nom_libelle | lower }}."""
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session{% if m2m %}, selectinload{% endif %}
 
+{% for cible in cibles_m2m -%}
+from app.modeles.{{ cible.snake }} import {{ cible.classe }}
+{% endfor -%}
 from app.modeles.{{ nom_snake }} import {{ nom_classe }}
 from app.schemas.{{ nom_snake }} import {{ nom_classe }}Creation, {{ nom_classe }}MiseAJour
+{% if m2m %}
 
+def _charger(session: Session, modele: type, identifiants: list[int]) -> list:
+    """Retrouve les éléments liés à partir de leurs identifiants (les doublons sont ignorés)."""
+    if not identifiants:
+        return []
+    return list(session.scalars(select(modele).where(modele.id.in_(set(identifiants)))))
+{% endif %}
 
 def lister(session: Session, *, saut: int = 0, limite: int = 50) -> list[{{ nom_classe }}]:
     requete = select({{ nom_classe }}).order_by({{ nom_classe }}.id).offset(saut).limit(limite)
+{%- if m2m %}
+    requete = requete.options({% for a in m2m %}selectinload({{ nom_classe }}.{{ a.attribut }}){% if not loop.last %}, {% endif %}{% endfor %})
+{%- endif %}
     return list(session.scalars(requete))
 
 
@@ -17,7 +30,14 @@ def obtenir(session: Session, identifiant: int) -> {{ nom_classe }} | None:
 
 
 def creer(session: Session, donnees: {{ nom_classe }}Creation) -> {{ nom_classe }}:
+{%- if m2m %}
+    objet = {{ nom_classe }}(**donnees.model_dump(exclude={ {%- for a in m2m %}"{{ a.ids }}"{% if not loop.last %}, {% endif %}{% endfor -%} }))
+{%- for a in m2m %}
+    objet.{{ a.attribut }} = _charger(session, {{ a.classe }}, donnees.{{ a.ids }})
+{%- endfor %}
+{%- else %}
     objet = {{ nom_classe }}(**donnees.model_dump())
+{%- endif %}
     session.add(objet)
     session.commit()
     session.refresh(objet)
@@ -27,7 +47,13 @@ def creer(session: Session, donnees: {{ nom_classe }}Creation) -> {{ nom_classe 
 def mettre_a_jour(
     session: Session, objet: {{ nom_classe }}, donnees: {{ nom_classe }}MiseAJour
 ) -> {{ nom_classe }}:
-    for champ, valeur in donnees.model_dump(exclude_unset=True).items():
+    valeurs = donnees.model_dump(exclude_unset=True)
+{%- for a in m2m %}
+    identifiants = valeurs.pop("{{ a.ids }}", None)
+    if identifiants is not None:
+        objet.{{ a.attribut }} = _charger(session, {{ a.classe }}, identifiants)
+{%- endfor %}
+    for champ, valeur in valeurs.items():
         setattr(objet, champ, valeur)
     session.commit()
     session.refresh(objet)

@@ -125,7 +125,20 @@ alioune g ressource produit -c "nom:str,prix:decimal,categorie:fk,fournisseur:fk
 - Génère d'abord le modèle lié : sa migration doit passer avant celle du produit. alioune te prévient si ce n'est pas le cas.
 - Relation vers les comptes : `proprietaire:fk(utilisateur)` après `alioune auth`.
 
-Limites actuelles : pas de relation plusieurs-à-plusieurs, ni d'un modèle vers lui-même (à ajouter à la main).
+Deux autres formes de relation :
+
+```bash
+# Plusieurs-à-plusieurs : table d'association, champ `etiquettes_ids` dans l'API
+alioune g ressource etiquette -c "nom:str"
+alioune g ressource produit -c "nom:str,prix:decimal,etiquettes:m2m(etiquette)"
+
+# Hiérarchie : un modèle qui pointe vers lui-même (le parent est facultatif)
+alioune g ressource categorie -c "nom:str,parent:fk(categorie)?"
+```
+
+- `m2m(modele)` crée la table d'association (clés étrangères en `CASCADE`, clé primaire composée) dans le modèle et dans la migration. L'API lit et écrit la liste d'identifiants (`etiquettes_ids`) et refuse (422) un identifiant inconnu.
+- La cible d'un `m2m` doit être indiquée, et il faut au moins un champ simple dans le modèle.
+- Supprimer un parent n'efface pas ses enfants : leur `parent_id` passe à `NULL`.
 
 ## Authentification (optionnelle)
 

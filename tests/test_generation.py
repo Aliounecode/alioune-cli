@@ -200,8 +200,8 @@ def test_relation_respecte_le_pluriel_du_modele_lie(projet: Path) -> None:
     assert 'ForeignKey("villes_senegal.id"' in (projet / "app/modeles/quartier.py").read_text()
 
 
-def test_relation_vers_soi_meme_et_config_refusees(projet: Path) -> None:
-    assert _ressource("categorie", "parent:fk(categorie)?").exit_code == 1
+def test_auto_reference_obligatoire_refusee_et_config_refusee(projet: Path) -> None:
+    assert _ressource("categorie", "nom:str,parent:fk(categorie)").exit_code == 1
     resultat = runner.invoke(app, ["g", "config", "stripe", "-c", "cle:fk"])
     assert resultat.exit_code == 1
 
@@ -216,4 +216,59 @@ def test_relation_vers_utilisateur(projet: Path) -> None:
     test = (projet / "tests/test_commandes.py").read_text()
     assert "_creer_utilisateur" in test and "import uuid" in test
     assert "409" not in test  # pas de route de suppression sur les utilisateurs
+    _compiler_tout(projet)
+
+
+# --- Auto-référence et plusieurs-à-plusieurs (m2m) ---------------------------
+
+def test_analyse_m2m() -> None:
+    champs = analyser_champs("nom:str,etiquettes:m2m(etiquette)")
+
+    m2m = [c for c in champs if c.est_m2m]
+    assert len(m2m) == 1 and m2m[0].cible == "etiquette"
+    assert m2m[0].ids == "etiquettes_ids"
+
+
+@pytest.mark.parametrize("texte", ["x:m2m", "x:m2m(etiquette)?", "x:m2m(Eti quette)"])
+def test_m2m_invalides(texte: str) -> None:
+    with pytest.raises(ErreurPlan):
+        analyser_champs(texte)
+
+
+def test_m2m_vers_soi_meme_refuse(projet: Path) -> None:
+    resultat = _ressource("etiquette", "nom:str,voisines:m2m(etiquette)")
+
+    assert resultat.exit_code == 1
+
+
+def test_ressource_avec_m2m(projet: Path) -> None:
+    assert _ressource("etiquette", "nom:str").exit_code == 0
+    resultat = _ressource("produit", "nom:str,etiquettes:m2m(etiquette)")
+
+    assert resultat.exit_code == 0, resultat.output
+    modele = (projet / "app/modeles/produit.py").read_text()
+    assert "produits_etiquettes = Table(" in modele
+    assert "relationship(secondary=produits_etiquettes)" in modele
+    assert "def etiquettes_ids" in modele
+    assert "etiquettes_ids" in (projet / "app/schemas/produit.py").read_text()
+    migration = next((projet / "alembic/versions").glob("*produits.py")).read_text()
+    assert '"produits_etiquettes"' in migration and "ondelete=\"CASCADE\"" in migration
+    assert "etiquettes" not in migration.split("create_table(")[1].split("sa.PrimaryKeyConstraint")[0]
+    _compiler_tout(projet)
+
+
+def test_m2m_sans_champ_simple_refuse(projet: Path) -> None:
+    _ressource("etiquette", "nom:str")
+
+    assert _ressource("produit", "etiquettes:m2m(etiquette)").exit_code == 1
+
+
+def test_ressource_auto_referencee(projet: Path) -> None:
+    resultat = _ressource("categorie", "nom:str,parent:fk(categorie)?")
+
+    assert resultat.exit_code == 0, resultat.output
+    modele = (projet / "app/modeles/categorie.py").read_text()
+    assert "remote_side=[id]" in modele
+    assert 'ForeignKey("categories.id", ondelete="SET NULL")' in modele
+    assert "test_associer_parent" in (projet / "tests/test_categories.py").read_text()
     _compiler_tout(projet)

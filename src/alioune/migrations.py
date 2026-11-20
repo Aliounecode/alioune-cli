@@ -103,3 +103,25 @@ def lignes_creation_table(
         downgrade.append(f'op.drop_index(op.f("{nom_index}"), table_name="{nom_table}")')
     downgrade.append(f'op.drop_table("{nom_table}")')
     return upgrade, downgrade
+
+
+def lignes_table_association(
+    nom: str, proprietaire: tuple[str, str], cible: tuple[str, str]
+) -> tuple[list[str], list[str]]:
+    """Lignes `upgrade` / `downgrade` d'une table d'association plusieurs-à-plusieurs.
+
+    `proprietaire` et `cible` : (colonne, table visée) de chaque côté. Les liens sont supprimés
+    en cascade quand l'un des deux éléments disparaît.
+    """
+    (col_a, table_a), (col_b, table_b) = proprietaire, cible
+    haut = [
+        "op.create_table(",
+        f'    "{nom}",',
+        f'    sa.Column("{col_a}", sa.Integer(), nullable=False),',
+        f'    sa.Column("{col_b}", sa.Integer(), nullable=False),',
+        f'    sa.ForeignKeyConstraint(["{col_a}"], ["{table_a}.id"], ondelete="CASCADE"),',
+        f'    sa.ForeignKeyConstraint(["{col_b}"], ["{table_b}.id"], ondelete="CASCADE"),',
+        f'    sa.PrimaryKeyConstraint("{col_a}", "{col_b}"),',
+        ")",
+    ]
+    return haut, [f'op.drop_table("{nom}")']

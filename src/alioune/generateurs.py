@@ -6,7 +6,12 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from alioune.migrations import DOSSIER_VERSIONS, lignes_creation_table, preparer_migration
+from alioune.migrations import (
+    DOSSIER_VERSIONS,
+    lignes_creation_table,
+    lignes_table_association,
+    preparer_migration,
+)
 from alioune.moteur import rendre_texte
 from alioune.noms import en_pascal_case, en_snake_case, nom_code_valide, pluriel_francais
 from alioune.plan import ErreurPlan, Insertion, Plan
@@ -47,6 +52,8 @@ EXEMPLES: dict[str, str] = {
 
 # fk  ou  fk(modele)  : relation vers un autre modèle (voir analyser_champs).
 MOTIF_FK = re.compile(r"^fk(?:\(([a-z][a-z0-9_-]*)\))?$")
+# m2m(modele) : relation plusieurs-à-plusieurs (le modèle visé est obligatoire).
+MOTIF_M2M = re.compile(r"^m2m\(([a-z][a-z0-9_-]*)\)$")
 
 
 @dataclass(frozen=True)
@@ -65,6 +72,15 @@ class Champ:
         return self.type == "fk"
 
     @property
+    def est_m2m(self) -> bool:
+        return self.type == "m2m"
+
+    @property
+    def ids(self) -> str:
+        """Plusieurs-à-plusieurs : nom du champ qui porte les identifiants (« etiquettes_ids »)."""
+        return f"{self.nom}_ids"
+
+    @property
     def relation(self) -> str:
         """Nom de l'attribut-relation (« categorie » pour « categorie_id »)."""
         return self.nom[: -len("_id")]
@@ -76,6 +92,8 @@ class Champ:
 
     @property
     def py(self) -> str:
+        if self.est_m2m:
+            return "list[int]"
         return "int" if self.est_fk else TYPES[self.type][0]
 
     @property
@@ -123,13 +141,18 @@ def _infos_modele(racine: Path | None, snake: str) -> tuple[str, str, bool]:
 
 
 def analyser_champs(
-    texte: str | None, defaut: str = "nom:str", racine: Path | None = None
+    texte: str | None,
+    defaut: str = "nom:str",
+    racine: Path | None = None,
+    soi: tuple[str, str, str] | None = None,
 ) -> list[Champ]:
     """'nom:str,prix:decimal,note:text?,categorie:fk' -> [Champ, ...].
 
     Types : str text int float decimal bool date datetime ; `?` à la fin = facultatif.
     Relation : `categorie:fk` (colonne categorie_id vers le modèle « categorie »)
     ou `origine:fk(pays)` (colonne origine_id vers le modèle « pays »).
+    Plusieurs-à-plusieurs : `etiquettes:m2m(etiquette)`.
+    `soi` = (nom, classe, table) du modèle en cours de génération (pour l'auto-référence).
     """
     brut = (texte or "").strip() or defaut
     champs: list[Champ] = []
@@ -148,9 +171,25 @@ def analyser_champs(
         if correspondance_fk:
             base = nom[: -len("_id")] if nom.endswith("_id") and len(nom) > 3 else nom
             cible = en_snake_case(correspondance_fk.group(1) or base)
-            classe, table, _ = _infos_modele(racine, cible)
+            if soi is not None and cible == soi[0]:
+                classe, table = soi[1], soi[2]
+            else:
+                classe, table, _ = _infos_modele(racine, cible)
             nom = f"{base}_id"
             champ = Champ(nom, "fk", nullable, cible, classe, table)
+        elif MOTIF_M2M.match(type_champ):
+            if nullable:
+                raise ErreurPlan(f"« {element} » : une relation plusieurs-à-plusieurs est toujours facultative, retire le « ? ».")
+            cible = en_snake_case(MOTIF_M2M.match(type_champ).group(1))
+            if soi is not None and cible == soi[0]:
+                raise ErreurPlan("Une relation plusieurs-à-plusieurs d'un modèle vers lui-même n'est pas générée automatiquement.")
+            classe, table, _ = _infos_modele(racine, cible)
+            champ = Champ(nom, "m2m", False, cible, classe, table)
+        elif type_champ.startswith("m2m"):
+            raise ErreurPlan(
+                f"Relation invalide : « {element} ». Syntaxe : etiquettes:m2m(etiquette) "
+                "(le modèle lié est obligatoire)."
+            )
         elif type_champ in TYPES:
             champ = Champ(nom, type_champ, nullable)
         elif type_champ.startswith("fk"):
@@ -161,7 +200,7 @@ def analyser_champs(
         else:
             raise ErreurPlan(
                 f"Type « {type_champ} » inconnu pour « {nom} ». "
-                f"Types disponibles : {', '.join(TYPES)}, fk."
+                f"Types disponibles : {', '.join(TYPES)}, fk, m2m."
             )
 
         if champ.nom in CHAMPS_RESERVES:
@@ -176,6 +215,8 @@ def analyser_champs(
             raise ErreurPlan(
                 f"Le nom « {champ.relation} » est utilisé à la fois par la relation et par un champ."
             )
+        if champ.est_m2m and champ.ids in noms:
+            raise ErreurPlan(f"Le nom « {champ.ids} » est utilisé à la fois par la relation et par un champ.")
     return champs
 
 
@@ -194,15 +235,23 @@ def _imports_stdlib(champs: list[Champ], avec_datetime: bool = False, avec_typin
     return "\n".join(lignes)
 
 
-def _contexte_relations(racine: Path | None, snake: str, champs: list[Champ]) -> dict:
+def _contexte_relations(snake: str, champs: list[Champ], m2m: list[Champ]) -> dict:
     """Informations sur les relations (modèles liés, URL, tests) utilisées par les gabarits."""
     relations = []
     cibles: dict[str, dict] = {}
+
+    def noter_cible(champ: Champ) -> None:
+        if champ.cible != snake:
+            cibles.setdefault(champ.cible, {
+                "snake": champ.cible, "classe": champ.classe_cible, "table": champ.table_cible,
+            })
+
     for champ in (c for c in champs if c.est_fk):
-        if champ.cible == snake:
+        auto = champ.cible == snake
+        if auto and not champ.nullable:
             raise ErreurPlan(
-                "Une relation d'un modèle vers lui-même n'est pas générée automatiquement : "
-                "génère le modèle, puis ajoute-la à la main."
+                f"La relation « {champ.nom} » vers le modèle lui-même doit être facultative "
+                f"(« {champ.relation}:fk({snake})? ») : le premier élément n'aurait pas de parent."
             )
         relations.append({
             "attribut": champ.nom,
@@ -213,11 +262,28 @@ def _contexte_relations(racine: Path | None, snake: str, champs: list[Champ]) ->
             "url": champ.table_cible.replace("_", "-"),
             "libelle": champ.cible.replace("_", " ").capitalize(),
             "nullable": champ.nullable,
+            "auto": auto,
         })
-        cibles.setdefault(champ.cible, {
-            "snake": champ.cible, "classe": champ.classe_cible, "table": champ.table_cible,
+        noter_cible(champ)
+
+    associations = []
+    for champ in m2m:
+        associations.append({
+            "attribut": champ.nom,
+            "ids": champ.ids,
+            "cible": champ.cible,
+            "classe": champ.classe_cible,
+            "table": champ.table_cible,
+            "url": champ.table_cible.replace("_", "-"),
+            "libelle": champ.cible.replace("_", " ").capitalize(),
+            "colonne_cible": f"{champ.cible}_id",
         })
-    return {"relations": relations, "cibles": list(cibles.values())}
+        noter_cible(champ)
+    cibles_m2m = {a["cible"]: {"snake": a["cible"], "classe": a["classe"]} for a in associations}
+    return {
+        "relations": relations, "m2m": associations,
+        "cibles": list(cibles.values()), "cibles_m2m": list(cibles_m2m.values()),
+    }
 
 
 def construire_contexte(nom: str, texte_champs: str | None, pluriel: str | None,
@@ -231,8 +297,18 @@ def construire_contexte(nom: str, texte_champs: str | None, pluriel: str | None,
     if snake in NOMS_RESERVES:
         raise ErreurPlan(f"« {snake} » est un nom réservé : choisis-en un autre.")
     nom_pluriel = en_snake_case(pluriel) if pluriel else pluriel_francais(snake)
-    champs = analyser_champs(texte_champs, champs_par_defaut, racine)
+    tous = analyser_champs(
+        texte_champs, champs_par_defaut, racine, soi=(snake, en_pascal_case(snake), nom_pluriel)
+    )
+    champs = [c for c in tous if not c.est_m2m]
+    m2m = [c for c in tous if c.est_m2m]
+    if not champs:
+        raise ErreurPlan("Ajoute au moins un champ simple (ex. nom:str) en plus des relations plusieurs-à-plusieurs.")
     obligatoires = [c.nom for c in champs if not c.nullable]
+    contexte_relations = _contexte_relations(snake, champs, m2m)
+    for association in contexte_relations["m2m"]:
+        association["table_association"] = f"{nom_pluriel}_{association['table']}"
+        association["colonne_proprietaire"] = f"{snake}_id"
     return {
         "nom_snake": snake,
         "nom_classe": en_pascal_case(snake),
@@ -246,25 +322,77 @@ def construire_contexte(nom: str, texte_champs: str | None, pluriel: str | None,
         "protege": False,
         "a_champ_obligatoire": bool(obligatoires),
         "champs_obligatoires": obligatoires,
-        **_contexte_relations(racine, snake, champs),
+        **contexte_relations,
     }
 
 
 # --- Générateurs unitaires -------------------------------------------------
 
+def _texte_tables_association(ctx: dict) -> str:
+    """Code des tables d'association (plusieurs-à-plusieurs), placé avant la classe du modèle."""
+    blocs = []
+    for a in ctx["m2m"]:
+        blocs.append(
+            f'{a["table_association"]} = Table(\n'
+            f'    "{a["table_association"]}",\n'
+            f'    Base.metadata,\n'
+            f'    Column("{a["colonne_proprietaire"]}", ForeignKey("{ctx["nom_table"]}.id", ondelete="CASCADE"), primary_key=True),\n'
+            f'    Column("{a["colonne_cible"]}", ForeignKey("{a["table"]}.id", ondelete="CASCADE"), primary_key=True),\n'
+            ")"
+        )
+    return "\n\n\n".join(blocs)
+
+
+def _texte_relations(ctx: dict) -> str:
+    """Relations et propriétés ajoutées à la fin de la classe du modèle."""
+    lignes = []
+    for r in ctx["relations"]:
+        optionnel = " | None" if r["nullable"] else ""
+        suite = ", remote_side=[id]" if r["auto"] else ""
+        lignes.append(
+            f'    {r["relation"]}: Mapped["{r["classe"]}{optionnel}"] = '
+            f'relationship(foreign_keys=[{r["attribut"]}]{suite})'
+        )
+    for a in ctx["m2m"]:
+        lignes.append(
+            f'    {a["attribut"]}: Mapped[list["{a["classe"]}"]] = relationship(secondary={a["table_association"]})'
+        )
+    proprietes = [
+        f'    @property\n    def {a["ids"]}(self) -> list[int]:\n'
+        f'        return [objet.id for objet in self.{a["attribut"]}]'
+        for a in ctx["m2m"]
+    ]
+    return "\n".join(lignes) + ("\n\n" + "\n\n".join(proprietes) if proprietes else "")
+
+
 def _fichier_modele(ctx: dict) -> tuple[Path, str]:
-    imports_sa = sorted({c.nom_sqlalchemy for c in ctx["champs"]})
+    imports_sa = {c.nom_sqlalchemy for c in ctx["champs"]}
+    if ctx["m2m"]:
+        imports_sa |= {"Column", "ForeignKey", "Table"}
+    imports_sa = sorted(imports_sa)
     contenu = rendre_texte("generer/modele.py.j2", {
         **ctx,
-        "imports_stdlib": _imports_stdlib(ctx["champs"], avec_typing=bool(ctx["relations"])),
+        "imports_stdlib": _imports_stdlib(ctx["champs"], avec_typing=bool(ctx["cibles"])),
         "imports_sqlalchemy": ", ".join(imports_sa),
+        "tables_texte": _texte_tables_association(ctx),
+        "relations_texte": _texte_relations(ctx),
     })
     return Path(f"app/modeles/{ctx['nom_snake']}.py"), contenu
 
 
 def _fichier_schema(ctx: dict) -> tuple[Path, str]:
+    imports_pydantic = ["BaseModel", "ConfigDict"]
+    if ctx["m2m"]:
+        imports_pydantic.append("Field")
+    if ctx["a_champ_obligatoire"]:
+        imports_pydantic.append("model_validator")
+    noms = ctx["champs_obligatoires"]
+    tuple_obligatoires = "(" + ", ".join(f'"{n}"' for n in noms) + ("," if len(noms) == 1 else "") + ")"
     contenu = rendre_texte("generer/schema.py.j2", {
-        **ctx, "imports_stdlib": _imports_stdlib(ctx["champs"], avec_datetime=True),
+        **ctx,
+        "tuple_obligatoires": tuple_obligatoires,
+        "imports_stdlib": _imports_stdlib(ctx["champs"], avec_datetime=True),
+        "imports_pydantic": ", ".join(imports_pydantic),
     })
     return Path(f"app/schemas/{ctx['nom_snake']}.py"), contenu
 
@@ -303,6 +431,14 @@ def _fichier_migration(racine: Path, ctx: dict) -> tuple[Path, str]:
     ]
     index = [(f"ix_{ctx['nom_table']}_{c.nom}", c.nom, False) for c in champs if c.est_fk]
     haut, bas = lignes_creation_table(ctx["nom_table"], colonnes, index, contraintes)
+    for association in ctx["m2m"]:
+        haut_assoc, bas_assoc = lignes_table_association(
+            association["table_association"],
+            (ctx["nom_snake"] + "_id", ctx["nom_table"]),
+            (association["colonne_cible"], association["table"]),
+        )
+        haut += [""] + haut_assoc
+        bas = bas_assoc + bas
     return preparer_migration(racine, f"creer_table_{ctx['nom_table']}", haut, bas)
 
 
@@ -389,14 +525,17 @@ def _preparer_tests(racine: Path, plan: Plan, ctx: dict) -> None:
     for relation in ctx["relations"]:
         routeur_parent = racine / "app" / "routeurs" / f"{relation['cible']}.py"
         if (
-            not relation["nullable"] and relation["cible"] != "utilisateur" and cles_appliquees
+            not relation["nullable"] and not relation["auto"]
+            and relation["cible"] != "utilisateur" and cles_appliquees
             and routeur_parent.is_file()
             and "IntegrityError" in routeur_parent.read_text(encoding="utf-8")
         ):
             restreinte = relation
             break
     ctx["relation_restreinte"] = restreinte
-    ctx["utilisateur_cible"] = any(r["cible"] == "utilisateur" for r in ctx["relations"])
+    ctx["utilisateur_cible"] = any(
+        r["cible"] == "utilisateur" for r in [*ctx["relations"], *ctx["m2m"]]
+    )
     plan.creations.append(_fichier_test(ctx))
 
 

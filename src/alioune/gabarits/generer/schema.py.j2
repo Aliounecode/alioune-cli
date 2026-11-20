@@ -1,9 +1,9 @@
 {{ imports_stdlib }}
 
-from pydantic import BaseModel, ConfigDict{% if a_champ_obligatoire %}, model_validator{% endif %}
+from pydantic import {{ imports_pydantic }}
 {% if a_champ_obligatoire %}
 # Champs qu'on ne peut pas mettre à null lors d'une modification.
-CHAMPS_OBLIGATOIRES = ({% for nom in champs_obligatoires %}"{{ nom }}", {% endfor %})
+CHAMPS_OBLIGATOIRES = {{ tuple_obligatoires }}
 {% endif %}
 
 class {{ nom_classe }}Base(BaseModel):
@@ -15,12 +15,18 @@ class {{ nom_classe }}Base(BaseModel):
 
 class {{ nom_classe }}Creation({{ nom_classe }}Base):
     """Données reçues pour créer : {{ nom_libelle | lower }}."""
+{% for a in m2m %}
+    {{ a.ids }}: list[int] = Field(default_factory=list)
+{%- endfor %}
 
 
 class {{ nom_classe }}MiseAJour(BaseModel):
     """Données reçues pour modifier (PATCH) : tous les champs sont optionnels."""
 {% for champ in champs %}
     {{ champ.nom }}: {{ champ.py }} | None = None
+{%- endfor %}
+{%- for a in m2m %}
+    {{ a.ids }}: list[int] | None = None
 {%- endfor %}
 {% if a_champ_obligatoire %}
     @model_validator(mode="after")
@@ -39,3 +45,6 @@ class {{ nom_classe }}Lecture({{ nom_classe }}Base):
     id: int
     cree_le: datetime
     modifie_le: datetime
+{%- for a in m2m %}
+    {{ a.ids }}: list[int]
+{%- endfor %}

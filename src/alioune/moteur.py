@@ -9,6 +9,7 @@ Règles de nommage dans `gabarits/` :
 
 from __future__ import annotations
 
+import re
 import shutil
 from pathlib import Path
 from typing import Any
@@ -37,8 +38,15 @@ def _environnement(source: Path) -> Environment:
 
 
 def rendre_texte(gabarit_fichier: str, contexte: dict[str, Any]) -> str:
-    """Rend un seul gabarit (chemin relatif à `gabarits/`, ex. `generer/modele.py.j2`)."""
-    return _environnement(DOSSIER_GABARITS).get_template(gabarit_fichier).render(**contexte)
+    """Rend un seul gabarit (chemin relatif à `gabarits/`, ex. `generer/modele.py.j2`).
+
+    Pour un fichier Python, les suites de lignes vides sont ramenées à deux au plus et le
+    fichier se termine par un seul saut de ligne (les conditions Jinja en laissent parfois trop).
+    """
+    contenu = _environnement(DOSSIER_GABARITS).get_template(gabarit_fichier).render(**contexte)
+    if gabarit_fichier.endswith(".py.j2"):
+        contenu = re.sub(r"\n{4,}", "\n\n\n", contenu).rstrip("\n") + "\n"
+    return contenu
 
 
 def rendre_en_memoire(gabarit: str, contexte: dict[str, Any]) -> list[tuple[Path, str]]:

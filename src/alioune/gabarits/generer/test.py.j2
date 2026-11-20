@@ -29,7 +29,7 @@ def _creer_utilisateur(client: TestClient) -> int:
 def donnees_valides(client: TestClient) -> dict:
     """Données valides pour créer : {{ nom_libelle | lower }} (les éléments liés sont créés au besoin)."""
     donnees = dict(DONNEES)
-{%- for r in relations %}
+{%- for r in relations if not r.auto %}
 {%- if r.cible == "utilisateur" %}
     donnees["{{ r.attribut }}"] = _creer_utilisateur(client)
 {%- else %}
@@ -90,6 +90,48 @@ def test_modifier_refuse_null_sur_un_champ_obligatoire(client: TestClient) -> No
 
     assert reponse.status_code == 422
 {% endif %}
+{% for r in relations if r.auto %}
+
+def test_associer_{{ r.relation }}(client: TestClient) -> None:
+    parent = client.post(URL, json=donnees_valides(client)).json()["id"]
+
+    reponse = client.post(URL, json={**donnees_valides(client), "{{ r.attribut }}": parent})
+
+    assert reponse.status_code == 201
+    assert reponse.json()["{{ r.attribut }}"] == parent
+
+
+def test_supprimer_{{ r.relation }}_conserve_les_enfants(client: TestClient) -> None:
+    parent = client.post(URL, json=donnees_valides(client)).json()["id"]
+    enfant = client.post(URL, json={**donnees_valides(client), "{{ r.attribut }}": parent}).json()["id"]
+
+    assert client.delete(f"{URL}/{parent}").status_code == 204
+    assert client.get(f"{URL}/{enfant}").status_code == 200
+{% endfor %}
+{% for a in m2m %}
+
+def test_associer_des_{{ a.attribut }}(client: TestClient) -> None:
+    donnees = donnees_valides(client)
+{%- if a.cible == "utilisateur" %}
+    id_lie = _creer_utilisateur(client)
+{%- else %}
+    id_lie = client.post("/api/{{ a.url }}", json=donnees_{{ a.cible }}(client)).json()["id"]
+{%- endif %}
+
+    creation = client.post(URL, json={**donnees, "{{ a.ids }}": [id_lie]})
+
+    assert creation.status_code == 201
+    assert creation.json()["{{ a.ids }}"] == [id_lie]
+    modification = client.patch(f"{URL}/{creation.json()['id']}", json={"{{ a.ids }}": []})
+    assert modification.status_code == 200
+    assert modification.json()["{{ a.ids }}"] == []
+
+
+def test_associer_{{ a.attribut }}_inexistants_renvoie_422(client: TestClient) -> None:
+    reponse = client.post(URL, json={**donnees_valides(client), "{{ a.ids }}": [999999]})
+
+    assert reponse.status_code == 422
+{% endfor %}
 {% if relations %}
 
 def test_creer_refuse_une_relation_inexistante(client: TestClient) -> None:

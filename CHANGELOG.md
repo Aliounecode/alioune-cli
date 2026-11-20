@@ -1,5 +1,11 @@
 # Journal des modifications
 
+## 0.3.0
+
+- `alioune generate` : relations plusieurs-à-plusieurs avec `m2m(modele)` (table d'association, migration, champ `*_ids` dans l'API, vérification 422).
+- `alioune generate` : auto-référence (`parent:fk(categorie)?` dans `categorie`) pour les hiérarchies.
+- Fichiers Python générés : lignes vides et tuples normalisés.
+
 ## 0.2.0
 
 - `alioune generate` : relations entre tables avec le type `fk` (`categorie:fk`, `origine:fk(pays)?`) : clé étrangère, index, relation SQLAlchemy, migration, vérification de l'existence (422) et refus de suppression d'un élément utilisé (409).
